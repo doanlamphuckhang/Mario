@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mario RL · Diorama 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="fx"></canvas>
+<div id="flash"></div>
+
+<header id="hud">
+  <div class="brand">
+    <div class="logo">M</div>
+    <div class="brand-text"><b>MARIO RL</b><span>Diorama 3D</span></div>
+  </div>
+  <div class="scoreboard">
+    <div class="stat"><label>MARIO</label><output id="h-score">000000</output></div>
+    <div class="stat"><label>XU</label><output id="h-coins">×00</output></div>
+    <div class="stat"><label>MÀN</label><output id="h-world">1-1</output></div>
+    <div class="stat"><label>THỜI GIAN</label><output id="h-time">400</output></div>
+  </div>
+  <div class="status">
+    <span id="mode-badge" class="badge">…</span>
+    <span id="fps" class="chip" title="Khung hình hiển thị mỗi giây">– fps</span>
+    <button id="btn-ui" class="icon" title="Ẩn/hiện bảng điều khiển (H)">◧</button>
+    <button id="btn-full" class="icon" title="Toàn màn hình (F)">⛶</button>
+  </div>
+</header>
+
+<aside id="brain" class="panel left">
+  <h2><span id="brain-title">Bộ não agent</span><small id="brain-sub"></small></h2>
+
+  <section class="views">
+    <figure>
+      <canvas id="nes" width="256" height="208"></canvas>
+      <figcaption>Khung NES gốc · 256×208</figcaption>
+    </figure>
+    <figure>
+      <canvas id="obs" width="84" height="84"></canvas>
+      <figcaption>Agent thấy · 84×84 xám</figcaption>
+    </figure>
+  </section>
+
+  <section id="policy-box">
+    <h3><span>Chính sách <em>π(a|s)</em></span></h3>
+    <div id="policy"></div>
+  </section>
+
+  <section id="value-box">
+    <h3><span>Giá trị <em>V(s)</em></span> <output id="v-now">–</output></h3>
+    <canvas id="spark-v" width="520" height="96"></canvas>
+  </section>
+
+  <section>
+    <h3>Phần thưởng mỗi bước <output id="r-now">–</output></h3>
+    <canvas id="spark-r" width="520" height="72"></canvas>
+  </section>
+
+  <section class="pad-wrap">
+    <div id="pad" class="pad" aria-label="Tay cầm NES">
+      <div class="dpad">
+        <i data-b="16" class="up">▲</i><i data-b="64" class="left">◀</i>
+        <i class="mid"></i><i data-b="128" class="right">▶</i><i data-b="32" class="down">▼</i>
+      </div>
+      <div class="ab"><i data-b="2" class="b">B</i><i data-b="1" class="a">A</i></div>
+    </div>
+    <dl class="mini">
+      <div><dt>Bước</dt><dd id="s-steps">0</dd></div>
+      <div><dt>Return</dt><dd id="s-ret">0.00</dd></div>
+      <div><dt>Entropy</dt><dd id="s-ent">–</dd></div>
+    </dl>
+  </section>
+</aside>
+
+<aside id="controls" class="panel right">
+  <h2>Điều khiển</h2>
+
+  <section>
+    <h3>Ai cầm tay cầm?</h3>
+    <div id="modes" class="seg col">
+      <button data-mode="agent"><b>Agent PPO</b><small>checkpoint đã train</small></button>
+      <button data-mode="demo"><b>Bản ghi mẫu</b><small>chuỗi phím về đích</small></button>
+      <button data-mode="human"><b>Tự chơi</b><small>bàn phím</small></button>
+      <button data-mode="random"><b>Ngẫu nhiên</b><small>baseline</small></button>
+      <button data-mode="right"><b>Luôn phải+nhảy</b><small>baseline</small></button>
+    </div>
+    <label id="ckpt-row" class="row" hidden>Checkpoint <select id="ckpt"></select></label>
+    <label id="det-row" class="row switch" hidden>
+      <input type="checkbox" id="det"><span></span>Lấy mẫu ngẫu nhiên từ π (thay vì argmax)
+    </label>
+    <p id="keys-help" class="help" hidden>
+      <kbd>←</kbd><kbd>→</kbd> di chuyển · <kbd>Z</kbd>/<kbd>Space</kbd> nhảy · <kbd>X</kbd>/<kbd>Shift</kbd> chạy · <kbd>↓</kbd> chui ống
+    </p>
+  </section>
+
+  <section class="grid2">
+    <label>Màn <select id="stage"></select></label>
+    <label>Tốc độ
+      <div id="speeds" class="seg"></div>
+    </label>
+  </section>
+
+  <section class="transport">
+    <button id="btn-pause" title="Tạm dừng / chạy tiếp (P)">❚❚ Tạm dừng</button>
+    <button id="btn-step" title="Tiến 1 bước khi đang dừng (.)">▸| Bước</button>
+    <button id="btn-reset" title="Chơi lại ván (R)">↺ Ván mới</button>
+  </section>
+
+  <section>
+    <h3>Góc máy</h3>
+    <div id="cams" class="seg wrap">
+      <button data-cam="diorama">Diorama</button>
+      <button data-cam="runner">Bám theo</button>
+      <button data-cam="classic">2D cổ điển</button>
+      <button data-cam="orbit">Lượn quanh</button>
+    </div>
+    <p class="help">Kéo chuột để xoay · lăn chuột để zoom · nhấp đúp để về mặc định</p>
+  </section>
+
+  <section>
+    <h3>Hình ảnh</h3>
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" id="q-shadow" checked><span></span>Đổ bóng</label>
+      <label class="switch"><input type="checkbox" id="q-bloom" checked><span></span>Bloom</label>
+      <label class="switch"><input type="checkbox" id="q-tilt" checked><span></span>Tilt-shift</label>
+      <label class="switch"><input type="checkbox" id="q-grid" checked><span></span>Vân voxel</label>
+      <label class="switch"><input type="checkbox" id="q-hi"><span></span>Nét cao (nặng GPU)</label>
+    </div>
+  </section>
+</aside>
+
+<footer id="track">
+  <div class="episode">
+    <div><label>Ván</label><output id="e-num">1</output></div>
+    <div><label>Về đích</label><output id="e-wins">0/0</output></div>
+    <div><label>x xa nhất</label><output id="e-best">0</output></div>
+  </div>
+  <div class="rail-wrap">
+    <div class="rail">
+      <div id="rail-fill"></div>
+      <div id="rail-marks"></div>
+      <div id="rail-mario" title="Vị trí Mario"></div>
+      <div id="rail-goal" title="Cột cờ">⚑</div>
+    </div>
+    <div class="rail-legend"><span id="rail-x">x = 0</span><span class="dot lose">chết</span><span class="dot win">về đích</span><span id="rail-end"></span></div>
+  </div>
+</footer>
+
+<div id="banner"></div>
+<div id="toasts"></div>
+<div id="overlay"><div class="card"><div class="spinner"></div><p id="overlay-text">Đang kết nối tới emulator…</p></div></div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+  // nếu module không nạp được (không có mạng để tải three.js) thì báo rõ thay vì màn hình trống
+  window.addEventListener('error', (e) => {
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      document.getElementById('overlay-text').textContent =
+        'Không tải được three.js từ CDN (cdn.jsdelivr.net). Viewer cần mạng để nạp thư viện 3D.';
+      document.querySelector('#overlay .spinner').style.display = 'none';
+    }
+  }, true);
+</script>
+</body>
+</html>

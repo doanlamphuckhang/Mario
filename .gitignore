@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Môi trường cục bộ (đường dẫn tuyệt đối tới .venv của máy này)
+.claude/
+
+# Checkpoint và file tạm khi train: quá lớn cho Git (mỗi file khoảng 20 MB)
+*.pt
+*.pt.tmp
+*.tmp
+.train.lock
+*.pending.zip
+runs/*.log
+runs/*/resume-backup-*/
+
+# Gói ZIP sinh bằng scripts/package_*.py
+mario_upgrade_v2.zip
+mario_train_drive.zip
+
+# Báo cáo Word sinh bằng scripts/build_report.py
+docs/BAO_CAO_MARIO.docx
+
+# Bản sao thủ công và log của các lần sửa trước khi có Git
+results/before-drive-workflow/
+results/pretrain-fix-backup-*/
+results/upgrade-backup-*/
+results/*-safety/
+results/package_train_*.py
+results/review_pretrain_*.py
+results/upgrade-status-*.json
+results/tmp*/

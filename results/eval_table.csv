@@ -1,0 +1,4 @@
+,flag_rate,max_x_mean,max_x_min,return_mean,clear_clock_ticks_mean,return_tho
+Ngẫu nhiên,0.0,697.39,199.0,5.759300000000008,,575.9300000000007
+"PPO: argmax, xuất phát lệch ngẫu nhiên",1.0,3161.0,3161.0,31.169000000000036,54.52,3116.9000000000037
+PPO: lấy mẫu từ π,1.0,3161.0,3161.0,31.16170000000004,54.11,3116.1700000000037

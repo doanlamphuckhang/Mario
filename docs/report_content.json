@@ -1,0 +1,331 @@
+{
+  "title": "Báo cáo hệ thống Mario PPO",
+  "subtitle": "Lý thuyết triển khai kết quả và cải tiến",
+  "date": "28 tháng 10 năm 2026",
+  "sections": [
+    {
+      "title": "Phạm vi và kết quả hiện có",
+      "paragraphs": [
+        "Báo cáo mô tả hệ thống PPO học chơi Super Mario Bros từ ảnh, kết quả thí nghiệm ban đầu và các thay đổi nhằm tăng điểm gameplay và học nhiều màn. Nội dung gắn với mã nguồn trong mario_rl, viewer3d, configs và các công cụ đánh giá.",
+        "Checkpoint ppo_1-1 đã thắng 100 trên 100 ván ở mỗi chế độ đánh giá trên màn 1-1. Tuy nhiên, các màn 1-2, 1-3, 1-4 và 2-1 đều chưa có ván thắng trong mẫu đánh giá. Người dùng quan sát demo và nhận thấy agent chủ yếu né địch để về đích; dữ liệu cũ chưa ghi số địch bị diệt hay điểm gameplay nên không thể lượng hóa hành vi đó bằng CSV hiện có.",
+        "Các thay đổi mới gồm reward theo điểm tăng thêm, thống kê score và xu, khởi tạo thí nghiệm từ checkpoint cũ, cấu hình học đa màn, bộ đánh giá theo ma trận và tổ chức lại mã. Những thay đổi này mới được chuẩn bị và đọc rà soát, chưa chạy kiểm thử hoặc huấn luyện. Vì vậy báo cáo không khẳng định mô hình mới đã tăng điểm hay chơi tốt hơn."
+      ]
+    },
+    {
+      "title": "Môi trường và bài toán học tăng cường",
+      "paragraphs": [
+        "Trong học tăng cường, agent quan sát môi trường, chọn hành động, nhận phần thưởng rồi lặp lại. Một episode trong dự án là một lượt chơi màn đã chọn, kết thúc khi Mario chết hoặc đạt điều kiện hoàn thành màn do môi trường cung cấp. Agent học từ hệ quả của hành động chứ không nhận nhãn hành động đúng ở từng ảnh.",
+        "Quan sát là ảnh, hành động là tổ hợp nút điều khiển, reward là tín hiệu do môi trường và lớp bọc tính ra. Mục tiêu tối ưu là phần thưởng tích lũy có chiết khấu: phần thưởng càng xa trong tương lai được nhân với càng nhiều hệ số gamma. Với gamma bằng 0,99, agent vẫn xem xét phần thưởng về sau nhưng ưu tiên phần thưởng gần hơn.",
+        "Return ghi trong episodes.csv là tổng reward thực tế của episode, không có chiết khấu. Nó khác với return mục tiêu dùng để huấn luyện critic. Điểm game hiển thị trên màn hình lại là một đại lượng khác nữa. Phân biệt ba khái niệm này giúp tránh nhận định nhầm rằng return cao đồng nghĩa điểm game cao.",
+        "Mã liên quan là MarioEnv trong mario_rl/envs.py và compute_gae trong mario_rl/ppo.py. Bộ gym-super-mario-bros đang dùng có phiên bản 7.4.0; dự án gọi trực tiếp SuperMarioBrosEnv và JoypadSpace, không thay sang Gymnasium trong lần cải tiến này."
+      ]
+    },
+    {
+      "title": "Quan sát và tập hành động",
+      "paragraphs": [
+        "Ảnh NES có kích thước 240 nhân 256 với ba kênh màu. MarioEnv đổi sang ảnh xám, thu về 84 nhân 84 rồi xếp chồng bốn ảnh gần nhất. Đầu vào mạng có dạng 4 nhân 84 nhân 84. Một ảnh đơn lẻ khó cho biết Mario đang đi lên hay rơi xuống; chuỗi bốn ảnh cung cấp thông tin chuyển động gần đây.",
+        "Mỗi quyết định được giữ trong bốn bước emulator theo frame_skip. Reward được cộng qua các bước đó. Hai khung cuối được lấy giá trị lớn nhất tại từng điểm ảnh để giảm hiện tượng sprite nhấp nháy. Đây là cách giảm chi phí suy luận và làm quan sát ổn định hơn, nhưng cũng giảm độ chính xác thời điểm điều khiển.",
+        "Ảnh được lưu dưới dạng uint8 để giảm bộ nhớ và chỉ chuyển sang float rồi chia 255 trong mạng. Nhờ vậy bộ đệm rollout không cần giữ toàn bộ ảnh bằng số thực ngay từ đầu.",
+        "Tập simple có bảy hành động, gồm đứng yên, đi phải, nhảy phải, chạy phải, vừa chạy vừa nhảy phải, nhảy tại chỗ và đi trái. Tập complex của thư viện có 12 hành động, bổ sung nhảy hoặc chạy trái, xuống và lên. Việc bổ sung hành động mở khả năng vào ống và điều chỉnh đường đi, nhưng không tự bảo đảm agent học sử dụng chúng.",
+        "Các màn được chỉ định bằng chuỗi như 1-1,1-2,1-3. Khi reset, mỗi môi trường chọn ngẫu nhiên đều một màn trong danh sách. NOOP đầu ván là một số bước không bấm nút; nó thay đổi thời điểm bắt đầu, không tạo bản đồ mới hay dịch Mario tới vị trí tùy ý."
+      ]
+    },
+    {
+      "title": "Mạng CNN và actor critic",
+      "paragraphs": [
+        "ActorCritic trong mario_rl/models.py dùng chung một CNN để trích đặc trưng ảnh. Ba lớp convolution có lần lượt 32, 64 và 64 kênh; kích thước kernel là 8, 4 và 3, stride là 4, 2 và 1. Đặc trưng được làm phẳng rồi qua lớp fully connected 512 nút với ReLU.",
+        "Actor biến đặc trưng thành logits của từng hành động. Categorical dùng logits để tạo phân phối xác suất. Khi train, hành động được lấy mẫu để agent có cơ hội khám phá. Khi đánh giá argmax, mạng chọn hành động có xác suất cao nhất; chế độ lấy mẫu cho thấy độ bền khi hành động có biến thiên.",
+        "Critic trả một số ước lượng giá trị trạng thái, tức mức phần thưởng tương lai được kỳ vọng. Critic giúp xác định một hành động có tốt hơn điều thường mong đợi tại trạng thái đó hay không. Hai nhánh dùng chung đặc trưng ảnh nhưng có đầu ra và vai trò khác nhau.",
+        "Các lớp được khởi tạo trực giao. Actor dùng hệ số khởi tạo nhỏ để phân phối ban đầu gần đều. Lần cải tiến này giữ kiến trúc và kích thước quan sát, nhờ đó có thể tận dụng CNN và actor của checkpoint đã học."
+      ]
+    },
+    {
+      "title": "Thu thập dữ liệu và ước lượng lợi thế",
+      "paragraphs": [
+        "SubprocVecEnv chạy nhiều môi trường trong các tiến trình con. Trainer gửi hành động, nhận ảnh, reward, cờ kết thúc và thống kê episode. Khi một episode kết thúc, worker reset môi trường nhưng vẫn trả thống kê của episode vừa xong.",
+        "Mỗi vòng PPO thu T bước từ N môi trường, nên có N nhân T mẫu. Run ban đầu dùng 16 môi trường với rollout_len bằng 128, tạo 2.048 mẫu. Các profile mới bắt đầu với bốn môi trường và rollout_len bằng 512, vẫn có 2.048 mẫu nhưng giảm số worker đồng thời.",
+        "Advantage biểu diễn mức tốt hơn hoặc kém hơn kỳ vọng. compute_gae tính sai số TD từ reward, giá trị hiện tại và giá trị tiếp theo. Sau đó hàm đi ngược rollout và cộng các sai số theo hệ số gamma nhân lambda. Cách này kết hợp thông tin ngắn hạn với thông tin của nhiều bước sau.",
+        "Cờ kết thúc chặn việc lấy giá trị của episode kế tiếp để dự đoán cho episode đã kết thúc. Khi rollout dừng nhưng episode chưa xong, code dùng next_value để bootstrap. Quy ước dones trong mã cần được giữ nhất quán vì một lỗi lệch chỉ số có thể làm agent học từ mục tiêu sai.",
+        "GAE dùng gamma bằng 0,99 và lambda bằng 0,95 trong các cấu hình hiện tại. Lambda điều chỉnh mức kết hợp nhiều bước: giảm lambda thiên về ước lượng gần dựa trên critic; tăng lambda dựa nhiều hơn vào kết quả trải nghiệm dài hơn. Cơ sở lý thuyết được trình bày trong công trình GAE của Schulman và cộng sự [2]."
+      ],
+      "code": [
+        "delta = rewards[t] + gamma * next_val * non_terminal - values[t]",
+        "last_gae = delta + gamma * lam * non_terminal * last_gae",
+        "adv[t] = last_gae",
+        "return_target = adv + values"
+      ]
+    },
+    {
+      "title": "PPO và các cơ chế ổn định",
+      "paragraphs": [
+        "PPO cập nhật chính sách từ dữ liệu vừa thu. Tỷ số ratio được tính bằng exp của chênh lệch log xác suất giữa chính sách mới và chính sách đã sinh hành động. Nếu advantage dương, tăng xác suất hành động đó là có lợi; nếu âm, nên giảm xác suất.",
+        "Hàm clipped_policy_loss giới hạn phần lợi ích có thể nhận khi tỷ số thay đổi vượt vùng cho phép. Với clip_coef bằng 0,2, vùng tham chiếu là từ 0,8 đến 1,2. Đây là cơ chế trong hàm mục tiêu, không phải cam kết rằng mọi tỷ số xác suất sau cập nhật đều nằm trong vùng đó. Nguồn lý thuyết là PPO của Schulman và cộng sự [1].",
+        "Loss tổng hợp gồm policy loss, value loss và entropy. Value loss huấn luyện critic khớp return mục tiêu; code có lựa chọn clip thay đổi giá trị và dùng sai số lớn hơn giữa hai cách tính. Entropy được trừ khỏi loss để khuyến khích phân phối bớt quá tập trung, giúp khám phá.",
+        "Code chuẩn hóa advantage trong mỗi minibatch, tối ưu bằng Adam và chặn norm gradient ở 0,5. Mỗi rollout được học bốn epoch, chia tám minibatch. Learning rate có thể giảm tuyến tính theo update. Các profile mới dùng target_kl bằng 0,02 để kết thúc sớm các epoch còn lại khi KL trung bình của epoch quá lớn.",
+        "Entropy giảm có thể phản ánh chính sách ổn định hơn, nhưng cũng có thể do mất khám phá. Explained variance gần một cho thấy critic khớp mục tiêu tốt trên dữ liệu đang xét, không chứng minh khả năng tổng quát hóa. KL nhỏ ở cuối run có thể do learning rate đã rất nhỏ. Các chỉ số phải được đọc cùng tỷ lệ thắng và hành vi thực tế."
+      ],
+      "code": [
+        "ratio = (new_logp - b_logp[mb]).exp()",
+        "loss = pg_loss - cfg.ent_coef * ent + cfg.vf_coef * v_loss"
+      ]
+    },
+    {
+      "title": "Reward ban đầu và lý do cần thay đổi",
+      "paragraphs": [
+        "Reward gốc trong phiên bản môi trường đang cài gồm tiến độ theo trục x, phạt thời gian và phạt chết. MarioEnv cộng reward qua frame-skip, thêm thưởng khi chạm cờ hoặc phạt bổ sung khi kết thúc thất bại, rồi nhân reward_scale.",
+        "Run ppo_1-1 dùng reward_scale bằng 0,01, flag_bonus bằng 50 và death_penalty bổ sung bằng 0. Mặc dù phạt bổ sung bằng không, môi trường gốc vẫn có thành phần phạt chết. Reward không trực tiếp thưởng tăng điểm game, xu hay diệt địch.",
+        "Vì vậy agent có thể tối ưu tốt bằng cách chạy và nhảy qua địch. Muốn agent quan tâm đến điểm số thì cần thay đổi mục tiêu hoặc dữ liệu học. Chỉ chạy lâu hơn với reward cũ chưa chắc tạo ra hành vi người dùng mong muốn.",
+        "Reward shaping thêm tín hiệu giúp việc học hướng tới mục tiêu cụ thể hơn. Tuy nhiên, điểm game đến từ nhiều hoạt động. Thưởng score có thể khiến agent ưu tiên xu hoặc vật phẩm thay vì chiến đấu. Đây là lý do phải kiểm tra cả số liệu lẫn video, thay vì chỉ nhìn return."
+      ]
+    },
+    {
+      "title": "Reward mới và thống kê gameplay",
+      "paragraphs": [
+        "ScoreReward trong mario_rl/score_reward.py được thích nghi từ cách cộng phần tăng score của CustomReward trong repo Viet Nguyen [3]. Code nguồn tham khảo sử dụng hệ số 1/40. Dự án giữ attribution và giấy phép MIT trong THIRD_PARTY_NOTICES.md.",
+        "Bộ tính mới lấy phần tăng score sau mỗi emulator step, không cộng lại toàn bộ score tích lũy. Nó ghi tổng score_gain trước cờ, số xu thu được và tổng reward shaping thô. Khi reset, score và xu được lấy làm mốc từ môi trường sau NOOP đầu ván, tránh tính phần xảy ra trước khi chính sách bắt đầu điều khiển.",
+        "Khung có flag_get và các khung sau đó không nhận shaping score. Điều này giảm nguy cơ thưởng cột cờ hoặc đổi thời gian còn lại thành điểm làm che khuất điểm gameplay. Bộ đếm xu xử lý trường hợp 99 chuyển về 0. Score cuối màn vẫn được ghi riêng để người đọc thấy số game báo.",
+        "Các hệ số score_weight và coin_bonus mặc định bằng không để giữ hành vi reward của run cũ. Profile mới thử score_weight bằng 0,1 với reward_scale bằng 0,01. Một sự kiện tăng 100 điểm thêm 0,1 reward, tăng 1.000 điểm thêm 1 reward. Flag bonus 500 tương ứng 5 reward; death_penalty bổ sung 50 tương ứng trừ 0,5 khi thất bại.",
+        "Coin bonus mặc định bằng không vì xu đã làm tăng score. Nếu cộng thêm thưởng xu quá lớn, chính sách có thể thiên về nhặt xu. Những hệ số trên là cấu hình thực nghiệm cần đối chứng, chưa phải tham số đã xác nhận hiệu quả.",
+        "Score gain không phải số địch bị diệt. Phá block, lấy xu và vật phẩm cũng tăng điểm. Bản cải tiến chưa có bộ đếm kill độc lập đã được kiểm chứng. CSV mới ghi score, score_gain, coins_collected, base_return và score_reward_raw; dữ liệu thiếu trong run cũ được hiểu là chưa biết, không tự gán bằng không."
+      ]
+    },
+    {
+      "title": "Dùng lại checkpoint và học đa màn",
+      "paragraphs": [
+        "initialize_policy trong mario_rl/transfer.py dùng checkpoint cục bộ để khởi tạo một thí nghiệm mới. CNN và các hàng actor có cùng tổ hợp nút được sao chép. Critic được giữ ở trạng thái khởi tạo mới, vì giá trị kỳ vọng thay đổi khi reward đổi. Optimizer, lịch learning rate, bộ đếm bước và lịch sử episode cũng bắt đầu lại.",
+        "Khi chuyển từ simple sang complex, code đối chiếu tập nút của từng hành động, không giả định chỉ số hàng giống nhau. Các hành động bổ sung giữ trọng số khởi tạo nhỏ và bias bằng âm bốn. Cách này giảm xác suất ban đầu của hành động mới nhưng không khóa chúng. Hiệu quả của lựa chọn này vẫn cần đo.",
+        "Config score_1-1.json đề xuất một triệu bước để học mục tiêu điểm trên màn quen thuộc từ checkpoint ppo_1-1. Config multistage.json đề xuất năm triệu bước trên 1-1, 1-2, 1-3, 1-4 và 2-1, dùng checkpoint của giai đoạn điểm số sau khi đã đánh giá.",
+        "Việc đưa màn cũ vào danh sách giúp chính sách tiếp tục nhận trải nghiệm từ màn đó trong khi học màn mới. Tuy nhiên, đây không phải bảo đảm không quên kỹ năng cũ. Cách chọn đều màn khi reset cũng không bảo đảm lượng timestep mỗi màn bằng nhau, vì episode dài ngắn khác nhau.",
+        "stage_metrics.json lưu thống kê 100 episode gần nhất của từng màn. Một tỷ lệ thắng tổng hợp có thể bị màn dễ chi phối; theo dõi riêng giúp nhận ra màn nào chưa tiến bộ. Cấu hình mới là hai giai đoạn do người dùng quyết định chuyển, chưa có curriculum tự động.",
+        "init_from và resume có ý nghĩa khác nhau. init_from tạo thí nghiệm mới và cho phép đổi mục tiêu; resume khôi phục model và optimizer của cùng thí nghiệm. Khi resume, các tham số liên quan cách học được kiểm tra tương thích; init_from phải để trống. Môi trường reset khi resume nên không tái tạo chính xác quỹ đạo emulator trước gián đoạn."
+      ]
+    },
+    {
+      "title": "Kết quả thí nghiệm ban đầu",
+      "paragraphs": [
+        "Dữ liệu được đọc từ runs/ppo_1-1 và các bảng trong results. Run dùng seed huấn luyện bằng một và kết thúc bình thường ở 2.998.272 bước. Với batch 2.048, số update là phần nguyên của 3.000.000 chia 2.048, tức 1.464. Phần thiếu so với ba triệu là do chỉ chạy rollout đầy đủ.",
+        "Đánh giá cuối dùng 100 ván cho mỗi chính sách. PPO thắng toàn bộ ở argmax có NOOP đầu ván và ở chế độ lấy mẫu. Điều này cho thấy độ ổn định trên giao thức đã thử, nhưng không bảo đảm thành công trên mọi trạng thái hoặc mọi màn.",
+        "Trong khoảng 2,5 đến 3 triệu bước huấn luyện, có 1.828 ván thắng trong 1.831 ván, khoảng 99,84%. Đây là dữ liệu từ chính sách đang học trong giai đoạn đó, không phải một tập đánh giá độc lập của riêng checkpoint cuối.",
+        "Mỗi checkpoint trung gian được đánh giá 50 ván. Mức giảm 96% xuống 90% ở mốc hai triệu tương ứng 48 xuống 45 ván thắng; chưa đủ để khẳng định có suy giảm bền vững. Kết quả sau đó đạt 100% ở cả mốc 2,5 triệu và checkpoint cuối.",
+        "Thời gian 54,52 hoặc 54,11 trong bảng đánh giá là số nhịp đồng hồ game đã tiêu hao theo phép tính 400 trừ time_left, không phải số giây thực. Return cũng không phải score game."
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Chính sách",
+            "Số ván thắng",
+            "x lớn nhất TB",
+            "Return TB"
+          ],
+          "rows": [
+            [
+              "Ngẫu nhiên gần đều",
+              "0/100",
+              "697,39",
+              "5,7593"
+            ],
+            [
+              "PPO argmax và NOOP",
+              "100/100",
+              "3.161",
+              "31,1690"
+            ],
+            [
+              "PPO lấy mẫu",
+              "100/100",
+              "3.161",
+              "31,1617"
+            ]
+          ]
+        },
+        {
+          "headers": [
+            "Bước train",
+            "Thắng trong 50 ván",
+            "Tỷ lệ"
+          ],
+          "rows": [
+            [
+              "501.760",
+              "9",
+              "18%"
+            ],
+            [
+              "1.001.472",
+              "36",
+              "72%"
+            ],
+            [
+              "1.501.184",
+              "48",
+              "96%"
+            ],
+            [
+              "2.000.896",
+              "45",
+              "90%"
+            ],
+            [
+              "2.500.608",
+              "50",
+              "100%"
+            ],
+            [
+              "2.998.272",
+              "50",
+              "100%"
+            ]
+          ]
+        },
+        {
+          "headers": [
+            "Màn chưa train",
+            "Số ván thắng",
+            "x lớn nhất TB"
+          ],
+          "rows": [
+            [
+              "1-2",
+              "0/30",
+              "395,067"
+            ],
+            [
+              "1-3",
+              "0/30",
+              "369,433"
+            ],
+            [
+              "1-4",
+              "0/30",
+              "371,133"
+            ],
+            [
+              "2-1",
+              "0/30",
+              "647,767"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "title": "So sánh reward scale và giới hạn kết luận",
+      "paragraphs": [
+        "Hai pilot chạy tới 598.016 bước, cùng seed bằng một và không giảm learning rate. Trong 100 ván train gần nhất của pilot scale 0,01, tỷ lệ thắng là 21% và x trung bình 2.191,6. Pilot scale 0,1 có tỷ lệ thắng 0% và x trung bình 1.029,14.",
+        "Trong thử nghiệm này, scale 0,01 là lựa chọn tốt hơn về tiến độ chơi. Không nên so trực tiếp độ lớn value loss hay return giữa hai scale vì đơn vị reward khác nhau. Một lần chạy mỗi cấu hình cũng chưa đủ chứng minh lựa chọn luôn tốt hơn.",
+        "Kết quả không qua được bốn màn mới cho thấy giới hạn chuyển kỹ năng của checkpoint hiện tại. Chưa có cơ sở gọi agent là bộ chơi Mario tổng quát. Việc tăng seed đánh giá của một checkpoint không thay thế nhiều seed huấn luyện độc lập.",
+        "Các bảng cũ không chứa score game và kill count. Không được lấy return_tho, vốn chỉ là return chia reward_scale, để điền thành điểm game. Muốn so sánh trước và sau theo score_gain cần chạy lại đánh giá checkpoint cũ bằng cùng mã đo mới khi được phép."
+      ]
+    },
+    {
+      "title": "Giao thức đánh giá mở rộng",
+      "paragraphs": [
+        "evaluate_suite trong mario_rl/cli/evaluate_suite.py đánh giá từng checkpoint trên cùng ma trận màn, seed, chế độ hành động và số ván. Mặc định gồm tám màn của World 1 và World 2, ba seed đánh giá, hai chế độ argmax và lấy mẫu, 20 ván cho mỗi tổ hợp. Như vậy có 960 ván mỗi checkpoint nếu chạy toàn ma trận.",
+        "run_eval_vec chia hạn ngạch episode cho từng worker. Cách này tránh việc chỉ lấy những ván ngắn kết thúc sớm hơn. Nếu một episode vượt max_steps, đánh giá báo lỗi và giữ các case đã ghi, không bịa điểm không hoặc tự thử lại.",
+        "Đầu ra gồm protocol.json, summary.csv và episodes.jsonl. Từng case lưu checkpoint, SHA-256 của file, config reward, màn, seed, chế độ, NOOP và các episode. Cờ trained_stage cho biết màn đó có trong config train hay không.",
+        "So sánh chính sách nên ưu tiên tỷ lệ thắng, score_gain và xu trên từng màn. Không dùng return để xếp hạng trực tiếp giữa hai mục tiêu reward khác nhau; cũng không lấy trung bình tọa độ x của nhiều màn có chiều dài khác nhau làm thước đo tổng quát.",
+        "Tiêu chí đề xuất cho giai đoạn 1 là giữ tỷ lệ thắng 1-1 ít nhất 95% và tăng score gameplay trung bình theo cùng giao thức. Cần xem video để xác nhận hành vi diệt địch. Với đa màn, báo từng màn và giữ 2-2, 2-3, 2-4 cho kiểm tra cuối nếu train đúng profile. Không chọn checkpoint hoặc chỉnh tham số dựa trên điểm của các màn giữ riêng.",
+        "ckpt_best.pt hiện vẫn chọn theo return trung bình của các ván train gần nhất. Tên best không có nghĩa là mô hình tốt nhất theo tỷ lệ thắng từng màn hoặc score độc lập. Các checkpoint cần qua đánh giá trước khi chọn bản demo."
+      ]
+    },
+    {
+      "title": "Checkpoint và quy trình Drive",
+      "paragraphs": [
+        "run_io.py dùng khóa thư mục để ngăn hai trainer ghi cùng run. Checkpoint được ghi vào file tạm rồi thay thế file đích. Khi resume, các dòng log mới hơn checkpoint được sao lưu trước khi đồng bộ lại. Cách làm này giảm nguy cơ log và trọng số không cùng mốc bước.",
+        "drive_backup.py tạo bản sao có phiên bản trên Drive và ghi checksum sau khi sao chép, kiểm tra xong. Restore chọn bản backup hợp lệ mới nhất. Bản backup mới gồm checkpoint, config, metrics, episodes và thêm transfer.json cùng stage_metrics.json.",
+        "Notebook mới trong notebooks/train_upgrade.ipynb chỉ điều phối: kiểm tra manifest ZIP, đọc profile, gọi CLI train, gọi bộ đánh giá và tạo demo nếu người dùng chạy ô tương ứng. Markdown được giữ ngắn. Mã trainer không được nhúng lặp lại trong notebook.",
+        "Gói nguồn không chứa checkpoint huấn luyện, ROM hoặc dataset tải thêm. Checkpoint đã có được cung cấp riêng hoặc khôi phục từ backup Drive đã chỉ định. Dependencies không bị tự cài hoặc nâng cấp trong notebook mới. Các lệnh huấn luyện được gọi foreground để người dùng thấy khi nào tiến trình đã kết thúc."
+      ]
+    },
+    {
+      "title": "Trình xem và tổ chức mã",
+      "paragraphs": [
+        "viewer3d là lớp trình bày độc lập với thuật toán học. scene.py đọc dữ liệu sprite và block từ RAM cùng ROM đang có để dựng cảnh voxel. session.py điều phối agent, người chơi hoặc replay; server.py phục vụ giao diện web. Việc dựng 3D không làm PPO học tốt hơn, nhưng giúp quan sát hành vi.",
+        "Agent vẫn nhận ảnh xám bốn khung, không nhận tọa độ địch từ trình xem. RAM được dùng cho thông tin môi trường, reward và dựng cảnh, nên cần phân biệt đầu vào của chính sách với dữ liệu phục vụ theo dõi. Các demo replay là chuỗi hành động mẫu, không được tính là kết quả của checkpoint PPO.",
+        "Mã được tổ chức theo cách tách package, tests, docs và scripts thường thấy ở CleanRL và Stable-Baselines3 [5, 6]. Core RL ở mario_rl; lệnh chạy ở mario_rl/cli; config thí nghiệm ở configs; notebook mới ở notebooks; tài liệu ở docs; công cụ đóng gói ở scripts.",
+        "Các file train.py, evaluate.py, baselines.py, play3d.py, plot_results.py và make_figures.py ở gốc trở thành entry point tương thích. Lệnh cũ vẫn hướng tới cùng implementation trong package. Dữ liệu runs và results không bị di chuyển; notebook đã có output ở gốc được giữ lại để đối chiếu.",
+        "Kiến trúc CNN và PPO hiện có được giữ lại. Repo Viet Nguyen được tận dụng ở reward shaping; SugarmanZhu được tham khảo về hành động và đa màn [4]. Không đưa toàn bộ trainer, mô hình RGB lớn hơn hoặc bộ thư viện mới vào chỉ để giống repo khác."
+      ]
+    },
+    {
+      "title": "Kiểm thử và công việc còn lại",
+      "paragraphs": [
+        "Các test cũ bao phủ phép tính GAE, PPO clipping, reward nền, việc sở hữu run, resume và backup. File tests/test_upgrade.py mới bổ sung các trường hợp score delta không tính lặp, coin rollover, loại điểm cờ, reset, frame-skip, chuyển action, giữ critic mới, config override, telemetry thiếu và ma trận đánh giá.",
+        "Những test mới đã được viết nhưng chưa được thực thi. Cũng chưa chạy lại test cũ sau tổ chức thư mục. Các kiểm tra đọc nguồn hoặc tính nhất quán file không thay thế kiểm thử Python, thử emulator hay đánh giá model.",
+        "Người dùng đang chạy một tiến trình khác và yêu cầu chưa khởi chạy mô phỏng hoặc train. Các ngưỡng tài nguyên của máy cũng chưa cho phép workload mới. Vì vậy chỉ thực hiện chỉnh mã và chuẩn bị tài liệu; không có model mới để công bố.",
+        "Khi có thể tiếp tục, thứ tự là kiểm tra cú pháp và regression CPU qua runner đã cài, smoke test môi trường cùng checkpoint trên phạm vi nhỏ, đánh giá baseline theo score mới, rồi mới thực hiện thí nghiệm được duyệt. Nếu có lỗi hoặc áp lực bộ nhớ thì giữ log và dừng, không tự lặp workload nặng.",
+        "Trước thay đổi, các file có sẵn được sao lưu trong results/upgrade-backup-20261028. Dự án hiện không có thư mục Git tại gốc; việc phục hồi dựa trên bản sao này. Các thay đổi mới cần được kiểm chứng trước khi dùng để thay thế bản demo đang có."
+      ]
+    },
+    {
+      "title": "Tài liệu tham khảo và bản đồ mã",
+      "paragraphs": [
+        "[1] Schulman và cộng sự. Proximal Policy Optimization Algorithms, 2017. https://arxiv.org/abs/1707.06347",
+        "[2] Schulman và cộng sự. High Dimensional Continuous Control Using Generalized Advantage Estimation, 2015. https://arxiv.org/abs/1506.02438",
+        "[3] Viet Nguyen. Super mario bros PPO pytorch, src/env.py, commit ab4248d715346c6adc33c2157455e2b98c130bcc. https://github.com/vietnh1009/Super-mario-bros-PPO-pytorch",
+        "[4] SugarmanZhu. Mario, wrappers.py và train_ppo.py. https://github.com/SugarmanZhu/Mario",
+        "[5] CleanRL, ppo_atari.py và cấu trúc repository. https://github.com/vwxyzjn/cleanrl",
+        "[6] Stable Baselines3, cấu trúc repository. https://github.com/DLR-RM/stable-baselines3",
+        "[7] mgelsinger. mario-ai-trainer, env_wrappers.py. https://github.com/mgelsinger/mario-ai-trainer"
+      ],
+      "tables": [
+        {
+          "headers": [
+            "Nội dung",
+            "File chính"
+          ],
+          "rows": [
+            [
+              "Môi trường và quan sát",
+              "mario_rl/envs.py"
+            ],
+            [
+              "Mạng CNN actor critic",
+              "mario_rl/models.py"
+            ],
+            [
+              "GAE và PPO",
+              "mario_rl/ppo.py"
+            ],
+            [
+              "Reward điểm game",
+              "mario_rl/score_reward.py"
+            ],
+            [
+              "Chuyển checkpoint",
+              "mario_rl/transfer.py"
+            ],
+            [
+              "Đánh giá và thống kê",
+              "mario_rl/evaluation.py"
+            ],
+            [
+              "Ma trận đánh giá",
+              "mario_rl/cli/evaluate_suite.py"
+            ],
+            [
+              "Cấu hình và CLI",
+              "configs/ và mario_rl/cli/train.py"
+            ],
+            [
+              "Checkpoint và backup",
+              "mario_rl/run_io.py, mario_rl/drive_backup.py"
+            ],
+            [
+              "Kiểm thử mới",
+              "tests/test_upgrade.py"
+            ],
+            [
+              "Viewer",
+              "viewer3d/"
+            ],
+            [
+              "Bằng chứng run ban đầu",
+              "runs/ppo_1-1/ và results/*.csv"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

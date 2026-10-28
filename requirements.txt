@@ -1,0 +1,12 @@
+# Python 3.11+. Colab: dùng colab_train.ipynb (tự cài mọi thứ). Windows: xem scripts/setup_nes_py_windows.py
+torch>=2.2
+numpy
+opencv-python
+pandas
+matplotlib
+pillow
+tqdm
+gym==0.26.2           # nes-py và gym-super-mario-bros phụ thuộc gym (không phải gymnasium)
+# nes-py==8.2.1 và gym-super-mario-bros==7.4.0 cài bằng --no-deps, sau đó chạy scripts/patch_nes_py_numpy2.py
+# Windows không có Visual Studio: scripts/setup_nes_py_windows.py (dùng ziglang để biên dịch)
+pytest                # chỉ để chạy kiểm thử: python -m pytest tests
