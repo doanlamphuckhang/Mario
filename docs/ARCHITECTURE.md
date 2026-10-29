@@ -33,7 +33,7 @@ Lệnh chuẩn, chạy từ thư mục gốc:
 ```text
 python -m mario_rl.cli.train --config configs/score_1-1.json
 python -m mario_rl.cli.evaluate --ckpt runs/ppo_1-1/ckpt_final.pt --device cpu
-python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_v2
+python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_suite
 python -m mario_rl.cli.play --ckpt runs/ppo_1-1/ckpt_final.pt
 ```
 

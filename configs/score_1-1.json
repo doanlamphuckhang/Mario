@@ -1,5 +1,5 @@
 {
-  "run_name": "ppo_score_1-1_v2",
+  "run_name": "ppo_score_1-1",
   "stages": "1-1",
   "init_from": "runs/ppo_1-1/ckpt_final.pt",
   "total_steps": 1000000,

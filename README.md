@@ -23,15 +23,15 @@ Các lệnh chuẩn từ thư mục gốc, chỉ chạy khi đã được phép 
 ```bash
 python -m mario_rl.cli.train --config configs/score_1-1.json
 python -m mario_rl.cli.train --config configs/multistage.json
-python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_v2
+python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_suite
 ```
 
 Mỗi lệnh là một workload riêng; không chạy đồng thời. Windows do agent thao tác
 phải dùng runner đã cài theo chính sách của dự án. Lệnh gốc `python train.py ...`
 vẫn hoạt động qua lớp tương thích.
 
-Gói `mario_upgrade_v2.zip` được tạo bằng `scripts/package_upgrade.py`, chưa đóng gói
-trong lần chỉnh sửa này. Gói cũ và notebook cũ được giữ nguyên để đối chiếu.
+Cả hai notebook (`colab_train.ipynb` và `notebooks/train_upgrade.ipynb`) dùng chung một gói
+nguồn `mario_train_drive.zip`, tạo bằng `python scripts/package_drive.py` và upload vào `MyDrive/Mario/`.
 
 Chỉ một báo cáo Word tổng hợp được dự kiến xuất tại `docs/BAO_CAO_MARIO.docx`, không
 chèn ảnh demo. Nội dung nằm trong `docs/report_content.json`, mã tạo là

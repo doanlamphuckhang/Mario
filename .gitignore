@@ -18,7 +18,6 @@ runs/*.log
 runs/*/resume-backup-*/
 
 # Gói ZIP sinh bằng scripts/package_*.py
-mario_upgrade_v2.zip
 mario_train_drive.zip
 
 # Báo cáo Word sinh bằng scripts/build_report.py
