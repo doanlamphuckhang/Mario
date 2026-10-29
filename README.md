@@ -31,7 +31,8 @@ phải dùng runner đã cài theo chính sách của dự án. Lệnh gốc `py
 vẫn hoạt động qua lớp tương thích.
 
 Cả hai notebook (`colab_train.ipynb` và `notebooks/train_upgrade.ipynb`) dùng chung một gói
-nguồn `mario_train_drive.zip`, tạo bằng `python scripts/package_drive.py` và upload vào `MyDrive/Mario/`.
+nguồn `mario_train_drive.zip`, tạo bằng `python scripts/package_drive.py` và upload vào My Drive
+(notebook mới tự tìm gói ở My Drive hoặc thư mục con, rồi lưu kết quả cạnh gói).
 
 Chỉ một báo cáo Word tổng hợp được dự kiến xuất tại `docs/BAO_CAO_MARIO.docx`, không
 chèn ảnh demo. Nội dung nằm trong `docs/report_content.json`, mã tạo là

@@ -95,10 +95,11 @@ không thể khôi phục từ return; phải đánh giá lại checkpoint cũ k
 
 Notebook ngắn: `notebooks/train_upgrade.ipynb`. Gói nguồn dùng chung với notebook cũ:
 `mario_train_drive.zip`, tạo bằng `python scripts/package_drive.py` rồi upload vào
-`MyDrive/Mario/`. Checkpoint nguồn `ppo_1-1` được lấy theo thứ tự: file
-`MyDrive/Mario/checkpoints/ppo_1-1/ckpt_final.pt` (~20,3 MB) nếu có, không thì bản
-backup của run `ppo_1-1` trong `MyDrive/Mario/runs/ppo_1-1/` (do `colab_train.ipynb`
-tự tạo khi train). Sửa `DRIVE_ROOT` nếu bạn dùng vị trí khác.
+My Drive hoặc một thư mục con (tối đa 2 cấp, ví dụ `MyDrive/Mario/`). Notebook tự tìm
+gói, nhiều bản thì lấy bản mới nhất, và dùng thư mục chứa gói làm gốc lưu `runs/`,
+`checkpoints/`, `evaluations/`. Checkpoint nguồn `ppo_1-1` được lấy theo thứ tự: file
+`<gốc>/checkpoints/ppo_1-1/ckpt_final.pt` (~20,3 MB) nếu có, không thì bản backup
+của run `ppo_1-1` trong `<gốc>/runs/ppo_1-1/` (do `colab_train.ipynb` tự tạo khi train).
 
 Notebook kiểm manifest, tạo workspace mới, đọc profile JSON và gọi CLI. Không
 nhúng trainer, không tải model. Nếu runtime thiếu `gym`, `nes-py` hoặc
