@@ -94,7 +94,7 @@
       "paragraphs": [
         "initialize_policy trong mario_rl/transfer.py dùng checkpoint cục bộ để khởi tạo một thí nghiệm mới. CNN và các hàng actor có cùng tổ hợp nút được sao chép. Critic được giữ ở trạng thái khởi tạo mới, vì giá trị kỳ vọng thay đổi khi reward đổi. Optimizer, lịch learning rate, bộ đếm bước và lịch sử episode cũng bắt đầu lại.",
         "Khi chuyển từ simple sang complex, code đối chiếu tập nút của từng hành động, không giả định chỉ số hàng giống nhau. Các hành động bổ sung giữ trọng số khởi tạo nhỏ và bias bằng âm bốn. Cách này giảm xác suất ban đầu của hành động mới nhưng không khóa chúng. Hiệu quả của lựa chọn này vẫn cần đo.",
-        "Config score_1-1.json đề xuất một triệu bước để học mục tiêu điểm trên màn quen thuộc từ checkpoint ppo_1-1. Config multistage.json đề xuất năm triệu bước trên 1-1, 1-2, 1-3, 1-4 và 2-1, dùng checkpoint của giai đoạn điểm số sau khi đã đánh giá.",
+        "Config stage.json dùng chung cho mọi màn: mỗi màn train một mô hình riêng, tối đa năm triệu bước, dừng sớm khi 100 ván train gần nhất về đích ít nhất 90%. Màn sau khởi tạo từ mô hình màn trước; màn đầu danh sách train từ đầu.",
         "Việc đưa màn cũ vào danh sách giúp chính sách tiếp tục nhận trải nghiệm từ màn đó trong khi học màn mới. Tuy nhiên, đây không phải bảo đảm không quên kỹ năng cũ. Cách chọn đều màn khi reset cũng không bảo đảm lượng timestep mỗi màn bằng nhau, vì episode dài ngắn khác nhau.",
         "stage_metrics.json lưu thống kê 100 episode gần nhất của từng màn. Một tỷ lệ thắng tổng hợp có thể bị màn dễ chi phối; theo dõi riêng giúp nhận ra màn nào chưa tiến bộ. Cấu hình mới là hai giai đoạn do người dùng quyết định chuyển, chưa có curriculum tự động.",
         "init_from và resume có ý nghĩa khác nhau. init_from tạo thí nghiệm mới và cho phép đổi mục tiêu; resume khôi phục model và optimizer của cùng thí nghiệm. Khi resume, các tham số liên quan cách học được kiểm tra tương thích; init_from phải để trống. Môi trường reset khi resume nên không tái tạo chính xác quỹ đạo emulator trước gián đoạn."
@@ -233,7 +233,7 @@
       "paragraphs": [
         "run_io.py dùng khóa thư mục để ngăn hai trainer ghi cùng run. Checkpoint được ghi vào file tạm rồi thay thế file đích. Khi resume, các dòng log mới hơn checkpoint được sao lưu trước khi đồng bộ lại. Cách làm này giảm nguy cơ log và trọng số không cùng mốc bước.",
         "drive_backup.py tạo bản sao có phiên bản trên Drive và ghi checksum sau khi sao chép, kiểm tra xong. Restore chọn bản backup hợp lệ mới nhất. Bản backup mới gồm checkpoint, config, metrics, episodes và thêm transfer.json cùng stage_metrics.json.",
-        "Notebook mới trong notebooks/train_upgrade.ipynb chỉ điều phối: kiểm tra manifest ZIP, đọc profile, gọi CLI train, gọi bộ đánh giá và tạo demo nếu người dùng chạy ô tương ứng. Markdown được giữ ngắn. Mã trainer không được nhúng lặp lại trong notebook.",
+        "Notebook notebooks/train_all_stages.ipynb chỉ điều phối: kiểm tra manifest ZIP, gọi mario_rl.campaign để train lần lượt từng màn (tự bỏ qua màn đã xong, train tiếp màn dở sau khi Colab ngắt), rồi gọi CLI đánh giá và quay video nhiều màn. Mã trainer không được nhúng lặp lại trong notebook.",
         "Gói nguồn không chứa checkpoint huấn luyện, ROM hoặc dataset tải thêm. Checkpoint đã có được cung cấp riêng hoặc khôi phục từ backup Drive đã chỉ định. Dependencies không bị tự cài hoặc nâng cấp trong notebook mới. Các lệnh huấn luyện được gọi foreground để người dùng thấy khi nào tiến trình đã kết thúc."
       ]
     },

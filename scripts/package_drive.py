@@ -13,11 +13,12 @@ from pathlib import Path
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ['colab_train.ipynb', 'notebooks/train_upgrade.ipynb',
+FILES = ['colab_train.ipynb', 'notebooks/train_all_stages.ipynb',
          'train.py', 'evaluate.py', 'evaluate_suite.py', 'baselines.py', 'plot_results.py',
          'make_figures.py', 'play3d.py', 'README.md', 'DRIVE_START_HERE.md',
          'THIRD_PARTY_NOTICES.md', 'requirements.txt',
-         'scripts/patch_nes_py_numpy2.py', 'scripts/build_colab_notebook.py', 'scripts/package_drive.py']
+         'scripts/patch_nes_py_numpy2.py', 'scripts/build_colab_notebook.py',
+         'scripts/build_stage_notebook.py', 'scripts/package_drive.py']
 FOLDERS = [('mario_rl', '*.py'), ('configs', '*.json'), ('tests', '*.py'), ('docs', '*.md')]
 VIEWER_SUFFIXES = ('.py', '.js', '.css', '.html', '.json')
 
@@ -41,8 +42,8 @@ def check(payload: dict[str, bytes]) -> None:
     colab = json.loads(payload['colab_train.ipynb'])
     if any('%%writefile' in ''.join(c['source']) for c in colab['cells']):
         raise ValueError('colab_train.ipynb must not embed source with %%writefile')
-    upgrade = json.loads(payload['notebooks/train_upgrade.ipynb'])
-    for cell in upgrade['cells']:
+    stages = json.loads(payload['notebooks/train_all_stages.ipynb'])
+    for cell in stages['cells']:
         if cell['cell_type'] == 'code':
             ast.parse(''.join(cell['source']))
 

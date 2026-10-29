@@ -1,0 +1,21 @@
+{
+  "actions": "complex",
+  "total_steps": 5000000,
+  "seed": 1,
+  "reward_scale": 0.01,
+  "score_weight": 0.025,
+  "coin_bonus": 0.0,
+  "flag_bonus": 500.0,
+  "death_penalty": 50.0,
+  "noop_max": 30,
+  "num_envs": 8,
+  "rollout_len": 256,
+  "lr": 0.00025,
+  "ent_coef": 0.01,
+  "stop_flag_rate": 0.9,
+  "stop_min_episodes": 100,
+  "snapshot_every": 1000000,
+  "backup_interval": 1200,
+  "backup_keep": 2,
+  "device": "auto"
+}

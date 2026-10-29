@@ -62,11 +62,15 @@ class PPOConfig:
     norm_adv: bool = True
     clip_vloss: bool = True
     target_kl: float | None = None
+    # --- dừng sớm: khi MỌI màn có ít nhất stop_min_episodes ván gần nhất và tỉ lệ về đích >= stop_flag_rate
+    stop_flag_rate: float = 0.0       # 0 = tắt, chạy đủ total_steps
+    stop_min_episodes: int = 100      # tối đa 100 (cửa sổ thống kê theo màn)
     # --- ghi log / checkpoint
     snapshot_every: int = 500_000     # lưu checkpoint mốc để xem agent tiến bộ theo thời gian
     resume: bool = False
     drive_backup_dir: str = ""       # thư mục đã mount; rỗng = không sao lưu
     backup_interval: int = 300        # giây giữa các bản sao (kiểm tra cuối update)
+    backup_keep: int = 0              # số bản sao Drive mới nhất được giữ; 0 = giữ tất cả
 
 
 METRIC_FIELDS = [
@@ -115,8 +119,8 @@ def clipped_policy_loss(ratio: torch.Tensor, adv: torch.Tensor, clip: float) -> 
 def validate_config(cfg: PPOConfig) -> None:
     parse_stages(cfg.stages)
     ScoreReward(cfg.score_weight, cfg.coin_bonus)
-    if cfg.noop_max < 0:
-        raise ValueError('noop_max must be nonnegative')
+    if cfg.noop_max < 0 or cfg.backup_keep < 0:
+        raise ValueError('noop_max and backup_keep must be nonnegative')
     if cfg.resume and cfg.init_from:
         raise ValueError('Choose resume OR init_from, not both')
     if cfg.device not in ('auto', 'cpu', 'cuda'):
@@ -132,6 +136,21 @@ def validate_config(cfg: PPOConfig) -> None:
         raise ValueError('total_steps must cover at least one rollout')
     if cfg.actions not in ACTION_SETS:
         raise ValueError(f'Unknown action set: {cfg.actions}')
+    if not 0.0 <= cfg.stop_flag_rate <= 1.0:
+        raise ValueError('stop_flag_rate must be in [0, 1]')
+    if not 1 <= cfg.stop_min_episodes <= 100:
+        raise ValueError('stop_min_episodes must be in 1..100')
+
+
+def stage_solved(stage_recent: dict, rate: float, min_episodes: int) -> bool:
+    """True khi mọi màn đã đủ số ván gần nhất và tỉ lệ về đích đạt ngưỡng (rate > 0)."""
+    if rate <= 0:
+        return False
+    for episodes in stage_recent.values():
+        recent = list(episodes)[-min_episodes:]
+        if len(recent) < min_episodes or np.mean([bool(e['flag']) for e in recent]) < rate:
+            return False
+    return True
 
 
 def train(cfg: PPOConfig) -> Path:
@@ -150,7 +169,8 @@ def _train(cfg: PPOConfig, run_dir: Path, resources: ExitStack) -> Path:
             raise FileNotFoundError(f'Resume requires {ckpt_path}; existing files were preserved')
         ck = torch.load(ckpt_path, map_location='cpu', weights_only=True)
         allowed_changes = {'resume', 'total_steps', 'out_dir', 'run_name', 'snapshot_every',
-                           'drive_backup_dir', 'backup_interval', 'init_from', 'device'}
+                           'drive_backup_dir', 'backup_interval', 'backup_keep', 'init_from', 'device',
+                           'stop_flag_rate', 'stop_min_episodes'}
         defaults = asdict(PPOConfig())
         for name, value in asdict(cfg).items():
             if name not in allowed_changes and ck['config'].get(name, defaults[name]) != value:
@@ -347,11 +367,13 @@ def _train(cfg: PPOConfig, run_dir: Path, resources: ExitStack) -> Path:
             improved = len(recent) >= 50 and row['ep_return'] > best_return
             if improved:
                 best_return = float(row['ep_return'])
+            solved = stage_solved(stage_recent, cfg.stop_flag_rate, cfg.stop_min_episodes)
             state = dict(model=model.state_dict(), optimizer=optimizer.state_dict(),
                          global_step=global_step, update=update, config=asdict(cfg),
                          best_return=best_return, recent=list(recent),
-                         stage_recent={s: list(es) for s, es in stage_recent.items()})
-            if update % 10 == 0 or update == num_updates:
+                         stage_recent={s: list(es) for s, es in stage_recent.items()},
+                         stopped_early=solved)
+            if update % 10 == 0 or update == num_updates or solved:
                 atomic_save(state, ckpt_path)
             if improved:
                 atomic_save(state, run_dir / "ckpt_best.pt")
@@ -360,15 +382,19 @@ def _train(cfg: PPOConfig, run_dir: Path, resources: ExitStack) -> Path:
                 next_snapshot += cfg.snapshot_every
             if cfg.drive_backup_dir and time.monotonic() - last_backup >= cfg.backup_interval:
                 atomic_save(state, ckpt_path)
-                saved = backup_run(run_dir, cfg.drive_backup_dir, global_step)
+                saved = backup_run(run_dir, cfg.drive_backup_dir, global_step, cfg.backup_keep)
                 last_backup = time.monotonic()
                 print(f'[Drive backup] {saved}', flush=True)
+            if solved:
+                print(f'[dừng sớm] {cfg.stop_min_episodes} ván gần nhất của mọi màn về đích '
+                      f'>= {cfg.stop_flag_rate:.0%} tại step {global_step:,}', flush=True)
+                break
     finally:
         mf.flush(); ef.flush()
 
     atomic_save(state, run_dir / "ckpt_final.pt")
     if cfg.drive_backup_dir:
-        saved = backup_run(run_dir, cfg.drive_backup_dir, global_step)
+        saved = backup_run(run_dir, cfg.drive_backup_dir, global_step, cfg.backup_keep)
         print(f'[Drive backup final] {saved}', flush=True)
     print(f"Xong. Đã lưu vào {run_dir}", flush=True)
     return run_dir

@@ -17,8 +17,19 @@ def digest(path):
     return value.hexdigest()
 
 
-def backup_run(run_dir, destination, step):
-    """Called synchronously by the trainer, after complete checkpoint/log writes."""
+def prune_backups(destination, keep):
+    """Keep only the newest `keep` verified backups; markers go first so a half-removed backup is never chosen."""
+    markers = sorted(Path(destination).glob('backup-*.zip.sha256'), reverse=True)
+    for marker in markers[keep:]:
+        marker.unlink(missing_ok=True)
+        marker.with_suffix('').unlink(missing_ok=True)
+
+
+def backup_run(run_dir, destination, step, keep=0):
+    """Called synchronously by the trainer, after complete checkpoint/log writes.
+
+    keep > 0 removes older verified backups after the new one is published (0 keeps all).
+    """
     run_dir, destination = Path(run_dir), Path(destination)
     if not (run_dir / 'ckpt_latest.pt').is_file():
         raise FileNotFoundError('No latest checkpoint to back up')
@@ -41,6 +52,8 @@ def backup_run(run_dir, destination, step):
     finally:
         # The local archive holds several checkpoints; do not leave it on the runtime disk.
         local.unlink(missing_ok=True)
+    if keep > 0:
+        prune_backups(destination, keep)
     return target
 
 

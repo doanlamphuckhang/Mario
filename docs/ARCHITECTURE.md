@@ -16,7 +16,9 @@ Mario/
 │   ├── evaluation.py         # đánh giá từng episode và tóm tắt
 │   ├── run_io.py             # quyền sở hữu run, checkpoint nguyên tử
 │   ├── drive_backup.py       # backup/restore Drive
-│   └── cli/                  # train, evaluate, evaluate_suite, play, baselines, plots
+│   ├── campaign.py           # train lần lượt từng màn: new / resume / done
+│   ├── demo.py               # quay video nhiều màn, nhiều ván
+│   └── cli/                  # train, evaluate, evaluate_suite, demo, play, baselines, plots
 ├── configs/                  # profile JSON có thể so sánh và tái lập
 ├── notebooks/                # notebook điều phối thí nghiệm mới
 ├── tests/                    # kiểm thử công thức, workflow, regression
@@ -31,9 +33,10 @@ Mario/
 Lệnh chuẩn, chạy từ thư mục gốc:
 
 ```text
-python -m mario_rl.cli.train --config configs/score_1-1.json
+python -m mario_rl.cli.train --config configs/stage.json --stages 1-1 --run_name ppo_1-1
 python -m mario_rl.cli.evaluate --ckpt runs/ppo_1-1/ckpt_final.pt --device cpu
 python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_suite
+python -m mario_rl.cli.demo --item 1-1=runs/ppo_1-1/ckpt_final.pt --episodes 3 --out results/demo
 python -m mario_rl.cli.play --ckpt runs/ppo_1-1/ckpt_final.pt
 ```
 
@@ -45,6 +48,7 @@ trainer. Config JSON chỉ cung cấp giá trị mặc định; cờ CLI cụ th
 Đường dẫn dữ liệu trong config được tính từ thư mục làm việc, nên luôn chạy ở gốc dự án.
 Checkpoint lưu toàn bộ config đã phân giải. Không di chuyển dữ liệu chạy cũ.
 
-`colab_train.ipynb` ở gốc giữ nguyên output của thí nghiệm trước. Notebook mới là
-`notebooks/train_upgrade.ipynb`. Hai ZIP nguồn tách tên để tránh nhầm phiên bản.
+`colab_train.ipynb` ở gốc giữ nguyên output của thí nghiệm 1-1 trước. Notebook train mọi màn là
+`notebooks/train_all_stages.ipynb` (sinh bằng `scripts/build_stage_notebook.py`). Cả hai dùng
+chung gói nguồn `mario_train_drive.zip`.
 Tài liệu gốc `BAO_CAO.md`, `DRIVE_START_HERE.md` dẫn đến bản chính trong `docs/`.

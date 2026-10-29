@@ -127,13 +127,17 @@ class UpgradeTests(unittest.TestCase):
             MarioEnv().step(0)
 
     def test_profile_override_and_validation(self):
-        cfg = parse_config(['--config', str(ROOT / 'configs/score_1-1.json'), '--seed', '3'])
+        cfg = parse_config(['--config', str(ROOT / 'configs/stage.json'), '--seed', '3'])
         self.assertEqual(cfg.seed, 3)
-        self.assertEqual(cfg.score_weight, .1)
+        self.assertEqual(cfg.actions, 'complex')
+        self.assertEqual(cfg.stop_flag_rate, .9)
         validate_config(cfg)
-        validate_config(parse_config(['--config', str(ROOT / 'configs/multistage.json')]))
+        for bad in (dict(stop_flag_rate=1.5), dict(stop_min_episodes=0), dict(stop_min_episodes=101),
+                    dict(backup_keep=-1)):
+            with self.assertRaises(ValueError):
+                validate_config(dataclasses.replace(cfg, **bad))
         with self.assertRaises(ValueError):
-            validate_config(dataclasses.replace(cfg, resume=True))
+            validate_config(dataclasses.replace(cfg, resume=True, init_from="x.pt"))
         for stages in ('', '1-1,1-1', '9-1', '1-5', []):
             with self.assertRaises(ValueError):
                 parse_stages(stages)

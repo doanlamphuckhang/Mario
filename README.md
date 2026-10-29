@@ -1,38 +1,34 @@
 # Mario RL: PPO tự chơi Super Mario Bros
 
-Tác tử PPO học chơi Super Mario Bros từ ảnh. Checkpoint ban đầu đã qua màn 1-1;
-bản mã mới bổ sung mục tiêu điểm số, chuyển checkpoint và thí nghiệm đa màn.
+Tác tử PPO học chơi Super Mario Bros từ ảnh. Lần train đầu đã vượt màn 1-1; bản hiện tại
+train lại từ đầu, mỗi màn một mô hình, lần lượt qua cả 32 màn và quay video demo nhiều màn.
 
-**Trạng thái bản nâng cấp:** đã sửa mã và chuẩn bị tài liệu; `pytest tests` (30 test,
-chỉ CPU) chạy qua, đánh giá ngắn checkpoint cũ trên emulator thật vẫn về đích. Chưa train
-với hai profile mới, nên chưa có kết quả để khẳng định điểm số hay tỷ lệ thắng đã tăng.
+**Trạng thái:** `pytest tests` (38 test, chỉ CPU) chạy qua; toàn bộ notebook đã được mô phỏng
+trên máy (trừ bước train). Chưa có lần train thật nào theo cách làm mới, nên chưa có số liệu
+về số màn vượt được.
 
 Checkpoint (`*.pt`) và gói ZIP sinh ra không nằm trong Git vì dung lượng lớn; chỉ có cấu
-hình và log CSV của các run. Muốn xem agent chơi cần có file checkpoint riêng
-(ví dụ `runs/ppo_1-1/ckpt_final.pt`) hoặc dùng bản ghi mẫu sẵn có trong viewer 3D.
+hình và log CSV của các run. Viewer 3D có sẵn bản ghi mẫu màn 1-1 để xem khi chưa có checkpoint.
 
-## Bắt đầu với bản nâng cấp
+## Train tất cả các màn trên Colab
 
-- [Hướng dẫn và nguồn GitHub](docs/UPGRADE_GUIDE.md)
-- [Cấu trúc mã](docs/ARCHITECTURE.md)
-- [Notebook mới](notebooks/train_upgrade.ipynb) với markdown ngắn
-- [Mục tiêu điểm trên 1-1](configs/score_1-1.json) và [học nhiều màn](configs/multistage.json)
+1. Tạo gói nguồn: `python scripts/package_drive.py` (không ghi đè gói có sẵn; xoá gói cũ trước).
+2. Upload `mario_train_drive.zip` vào My Drive.
+3. Mở [notebooks/train_all_stages.ipynb](notebooks/train_all_stages.ipynb) trên Colab, chọn GPU,
+   chạy lần lượt các ô: train từng màn → bảng tình trạng → đánh giá → video demo.
+4. Colab ngắt giữa chừng: Restart session, chạy lại từ ô đầu; màn xong được bỏ qua, màn dở train tiếp.
 
-Các lệnh chuẩn từ thư mục gốc, chỉ chạy khi đã được phép và đủ tài nguyên:
+Chi tiết: [hướng dẫn](docs/UPGRADE_GUIDE.md), [cấu trúc mã](docs/ARCHITECTURE.md),
+[profile mỗi màn](configs/stage.json). Lệnh tương đương từ thư mục gốc:
 
 ```bash
-python -m mario_rl.cli.train --config configs/score_1-1.json
-python -m mario_rl.cli.train --config configs/multistage.json
-python -m mario_rl.cli.evaluate_suite --ckpts runs/ppo_1-1/ckpt_final.pt --out results/eval_suite
+python -m mario_rl.cli.train --config configs/stage.json --stages 1-2 --run_name ppo_1-2
+python -m mario_rl.cli.evaluate --ckpt runs/ppo_1-2/ckpt_final.pt --stage 1-2 --episodes 20
+python -m mario_rl.cli.demo --item 1-1=runs/ppo_1-1/ckpt_final.pt --item 1-2=runs/ppo_1-2/ckpt_final.pt --episodes 3 --out results/demo
 ```
 
-Mỗi lệnh là một workload riêng; không chạy đồng thời. Windows do agent thao tác
-phải dùng runner đã cài theo chính sách của dự án. Lệnh gốc `python train.py ...`
+Mỗi lệnh train là một workload dài; không chạy đồng thời. Lệnh gốc `python train.py ...`
 vẫn hoạt động qua lớp tương thích.
-
-Cả hai notebook (`colab_train.ipynb` và `notebooks/train_upgrade.ipynb`) dùng chung một gói
-nguồn `mario_train_drive.zip`, tạo bằng `python scripts/package_drive.py` và upload vào My Drive
-(notebook mới tự tìm gói ở My Drive hoặc thư mục con, rồi lưu kết quả cạnh gói).
 
 Chỉ một báo cáo Word tổng hợp được dự kiến xuất tại `docs/BAO_CAO_MARIO.docx`, không
 chèn ảnh demo. Nội dung nằm trong `docs/report_content.json`, mã tạo là
