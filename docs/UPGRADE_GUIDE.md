@@ -102,9 +102,9 @@ gói, nhiều bản thì lấy bản mới nhất, và dùng thư mục chứa g
 của run `ppo_1-1` trong `<gốc>/runs/ppo_1-1/` (do `colab_train.ipynb` tự tạo khi train).
 
 Notebook kiểm manifest, tạo workspace mới, đọc profile JSON và gọi CLI. Không
-nhúng trainer, không tải model. Nếu runtime thiếu `gym`, `nes-py` hoặc
-`gym-super-mario-bros`, notebook cài đúng phiên bản đã chốt (không nâng cấp gói có sẵn)
-rồi vá `nes-py` cho NumPy 2; đặt `INSTALL_MISSING = False` nếu chỉ muốn kiểm tra.
+nhúng trainer, không tải model. Nếu runtime thiếu hoặc có phiên bản khác của `gym`,
+`nes-py`, `gym-super-mario-bros` (Colab có sẵn `gym 0.25.x`), notebook cài đúng phiên bản
+đã chốt rồi vá `nes-py` cho NumPy 2; đặt `INSTALL_DEPS = False` nếu chỉ muốn kiểm tra.
 Biến `DEVICE` mặc định `cpu`; chỉ chọn `cuda` khi chủ động muốn dùng GPU.
 Huấn luyện chạy foreground; chạy đánh giá sau khi trainer đã thoát. Backup Drive
 vẫn theo chu kỳ và cuối run, gồm cả telemetry theo màn và thông tin chuyển checkpoint.
